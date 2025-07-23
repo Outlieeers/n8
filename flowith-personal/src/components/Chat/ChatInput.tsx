@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import { useChatStore } from '../../stores/chatStore'; // Import the Zustand store for chat
 
 // ChatInput component: provides a textarea for user input and a send button.
@@ -8,10 +8,19 @@ const ChatInput: React.FC = () => {
 
   // Get isLoading state and sendUserMessage action from the chat store
   // Using a selector to get specific parts of the store state.
-  const { isLoading, sendUserMessage } = useChatStore((state) => ({
+  const { isLoading, sendUserMessage, prefilledMessage, setPrefilledMessage } = useChatStore((state) => ({
     isLoading: state.isLoading, // To disable input/button while AI is responding
     sendUserMessage: state.sendUserMessage, // Action to send the message
+    prefilledMessage: state.prefilledMessage,
+    setPrefilledMessage: state.setPrefilledMessage,
   }));
+
+  useEffect(() => {
+    if (prefilledMessage) {
+      setInputValue(prefilledMessage);
+      setPrefilledMessage(''); // Clear the prefilled message after using it
+    }
+  }, [prefilledMessage, setPrefilledMessage]);
 
   // Handler for textarea value changes
   const handleInputChange = (event: React.ChangeEvent<HTMLTextAreaElement>) => {
