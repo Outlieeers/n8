@@ -1,7 +1,7 @@
 import React from 'react';
 import Header from './Header';
 import SidebarLeft from './SidebarLeft';
-import ChatArea from './ChatArea';
+import Canvas from '../Canvas/Canvas';
 
 const Layout: React.FC = () => {
   return (
@@ -9,7 +9,7 @@ const Layout: React.FC = () => {
       <Header />
       <div className="flex flex-1 overflow-hidden">
         <SidebarLeft />
-        <ChatArea />
+        <Canvas />
         {/* Sidebar Direita (configurações do modelo, etc.) pode ser adicionada aqui no futuro */}
       </div>
     </div>

@@ -2,15 +2,20 @@ import { create } from 'zustand';
 import { persist, createJSONStorage } from 'zustand/middleware';
 import { Message } from '../components/Chat/ChatMessage'; // Data structure for a chat message
 import { streamOpenAIResponse } from '../services/api/openai'; // Function to call OpenAI API
+import { useCanvasStore } from './canvasStore';
 
 // Defines the structure of the chat state managed by Zustand
 interface ChatState {
   messages: Message[]; // Array to hold all chat messages
   isLoading: boolean; // Flag to indicate if AI is currently responding
+  prefilledMessage: string | null; // New state for the pre-filled message
   addMessage: (message: Message) => void; // Action to add a new message to the list
   setLoading: (loading: boolean) => void; // Action to set the loading state
+  setPrefilledMessage: (message: string) => void; // New action to set the pre-filled message
   updateMessageText: (messageId: string, newText: string) => void; // Action to update text of an existing message (for streaming)
   sendUserMessage: (text: string) => Promise<void>; // Action to handle sending a user's message
+  startBrainstorming: (centralIdea: string) => Promise<void>;
+  surpriseMe: () => Promise<void>;
 }
 
 // Create the Zustand store for chat
@@ -27,11 +32,14 @@ export const useChatStore = create<ChatState>()(
         },
       ],
       isLoading: false, // Initially, AI is not loading/responding
+      prefilledMessage: null, // Initial value for prefilledMessage
       // Action to add a new message to the 'messages' array
       addMessage: (message) =>
         set((state) => ({ messages: [...state.messages, message] })),
       // Action to set the 'isLoading' state
       setLoading: (loading) => set({ isLoading: loading }),
+      // Action to set the 'prefilledMessage' state
+      setPrefilledMessage: (message) => set({ prefilledMessage: message }),
       // Action to update the text of an existing message, identified by messageId.
       // This is crucial for streaming, where an AI message is first added with partial text,
       // and then its text is progressively updated. Timestamp is also updated.
@@ -45,6 +53,7 @@ export const useChatStore = create<ChatState>()(
       sendUserMessage: async (text: string) => {
         // Get current state and actions using get()
         const { addMessage, setLoading, updateMessageText, messages: currentMessages } = get();
+        const { addNode, addConnection, addGroup } = useCanvasStore.getState();
 
         // Create the user's message object
         const userMessage: Message = {
@@ -70,8 +79,38 @@ export const useChatStore = create<ChatState>()(
         await streamOpenAIResponse(apiMessages, {
           addMessage,       // Action to add new (AI) messages
           setLoading,       // Action to control loading indicator
-          updateMessageText, // Action to update AI message text during streaming
+          updateMessageText: (messageId, newText) => {
+            updateMessageText(messageId, newText);
+            if (newText.includes('CREATE_NODE')) {
+              const content = newText.split('CREATE_NODE:')[1].trim();
+              const newNodeId = `node-${Date.now()}`;
+              addNode({
+                id: newNodeId,
+                x: Math.random() * 500,
+                y: Math.random() * 500,
+                content,
+              });
+            }
+            if (newText.includes('CREATE_CONNECTION')) {
+              const ids = newText.split('CREATE_CONNECTION:')[1].trim().split(',');
+              addConnection({ from: ids[0], to: ids[1] });
+            }
+            if (newText.includes('GROUP_NODES')) {
+              const nodeIds = newText.split('GROUP_NODES:')[1].trim().split(',');
+              addGroup({ nodeIds });
+            }
+          },
         });
+      },
+      startBrainstorming: async (centralIdea: string) => {
+        const { sendUserMessage } = get();
+        const prompt = `Brainstorm ideas related to "${centralIdea}". Generate a list of related ideas, each prefixed with "CREATE_NODE:". For each new node, create a connection to the central idea node with the command "CREATE_CONNECTION: central-idea-id,new-node-id".`;
+        await sendUserMessage(prompt);
+      },
+      surpriseMe: async () => {
+        const { sendUserMessage } = get();
+        const prompt = 'Generate a surprising, random, and unexpected idea. The response should be a single idea, prefixed with "CREATE_NODE:".';
+        await sendUserMessage(prompt);
       },
     }),
     {
